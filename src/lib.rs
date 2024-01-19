@@ -34,24 +34,42 @@ pin_project! {
     buf: BytesMut,
         delimiter: D,
     found: bool,
+    limit: usize,
     }
 }
 
 impl<St, D> DelimiterSlice<St, D> {
+    const CAPACITY: usize = 8_192;
+
+    const LIMIT: usize = usize::MAX;
+
     /// Create a new `DelimiterSlice` based on the provided stream and delimiter.
     ///
     /// This defaults instantiating the underlying buffer with a capacity of 8,192 bytes.
     pub fn new(stream: St, delimiter: D) -> Self {
-        Self::with_capacity(stream, 8_192, delimiter)
+        Self::with_capacity_and_limit(stream, delimiter, Self::CAPACITY, Self::LIMIT)
     }
 
-    /// Create a new `DelimiterSlice` based on the provided stream, delimiter, and capacity.
-    pub fn with_capacity(stream: St, capacity: usize, delimiter: D) -> Self {
+    pub fn with_capacity(stream: St, delimiter: D, capacity: usize) -> Self {
+        Self::with_capacity_and_limit(stream, delimiter, capacity, Self::LIMIT)
+    }
+
+    pub fn with_limit(stream: St, delimiter: D, limit: usize) -> Self {
+        Self::with_capacity_and_limit(stream, delimiter, Self::CAPACITY, limit)
+    }
+
+    pub fn with_capacity_and_limit(
+        stream: St,
+        delimiter: D,
+        capacity: usize,
+        limit: usize,
+    ) -> Self {
         Self {
             stream,
             buf: BytesMut::with_capacity(capacity),
             delimiter,
             found: false,
+            limit,
         }
     }
 
@@ -70,6 +88,10 @@ impl<St, D> DelimiterSlice<St, D> {
     pub fn into_inner(self) -> St {
         assert!(self.buf.is_empty());
         self.stream
+    }
+
+    fn limit_reached_err() -> std::io::Error {
+        std::io::Error::new(std::io::ErrorKind::OutOfMemory, "Limit exceeded")
     }
 }
 
@@ -111,7 +133,14 @@ where
             }
 
             match ready!(this.stream.as_mut().poll_next(cx)) {
-                Some(Ok(data)) => this.buf.extend_from_slice(&data),
+                Some(Ok(data)) => {
+                    if this.buf.len().saturating_add(data.len()).ge(this.limit) {
+                        return Poll::Ready(Some(Err(Self::limit_reached_err())));
+                    } else {
+                        this.buf.extend_from_slice(&data);
+                        continue;
+                    }
+                }
                 Some(error) => return Poll::Ready(Some(error)),
                 None => exhausted = true,
             }
