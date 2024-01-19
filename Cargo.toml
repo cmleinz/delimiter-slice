@@ -4,16 +4,18 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Caleb Leinz <caleb.leinz@atlasspace.com>"]
 description = "Stream type for splitting a delimited stream"
+license = "MIT"
 readme = "README.md"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+repository = "https://github.com/cmleinz/delimiter-slice"
+keywords = ["futures", "async", "future", "stream"]
+categories = ["asynchronous"]
 
 [dependencies]
-bytes = "1.5.0"
-futures-core = "0.3.30"
-futures-util = "0.3.30"
-pin-project-lite = "0.2.13"
+bytes = { version = "1.5.0" }
+futures-core = { version = "0.3.30" }
+futures-util = { version = "0.3.30" }
+pin-project-lite = { version = "0.2.13" }
 
 [dev-dependencies]
-tokio = { version = "1.35.1", features = ["full"] }
+tokio = { version = "1.35.1", features = ["rt", "macros"] }
 tokio-util = { version = "0.7.10", features = ["io"] }
